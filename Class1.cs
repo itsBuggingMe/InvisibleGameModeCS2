@@ -57,15 +57,17 @@ public class InvisPlugin : BasePlugin
         }
         if (player == null)
             return;
-        if (!InvisIds.Contains(player.UserId))
+
+        string playerName = commandInfo.ArgString;
+        var targetPlayer = Server.GetPlayerByName(playerName);
+        if (!InvisIds.Contains(targetPlayer.UserId))
         {
-            commandInfo.ReplyToCommand("User " + player.PlayerName + " is now invisible");
-            player.PlayerPawn.Value.NextRadarUpdateTime = 0.0f;
-            SetPlayerInvisible(player);
-            InvisIds.Add(player.UserId);
+            commandInfo.ReplyToCommand("User " + targetPlayer.PlayerName + " is now invisible");
+            targetPlayer.PlayerPawn.Value.NextRadarUpdateTime = 0.0f;
+            SetPlayerInvisible(targetPlayer);
+            InvisIds.Add(targetPlayer.UserId);
             commandInfo.ReplyToCommand("Invisiblity enabled");
         }
-
     }
 
     [ConsoleCommand("css_uninvis", "Make Visible command")]
@@ -73,10 +75,14 @@ public class InvisPlugin : BasePlugin
     {
         if (player == null || !player.IsValid || !player.PawnIsAlive)
             return;
-        if (InvisIds.Contains(player.UserId))
+
+        string playerName = commandInfo.ArgString;
+        var targetPlayer = Server.GetPlayerByName(playerName);
+
+        if (InvisIds.Contains(targetPlayer.UserId))
         {
-            InvisIds.Remove(player.UserId);
-            SetPlayerVisible(player);
+            InvisIds.Remove(targetPlayer.UserId);
+            SetPlayerVisible(targetPlayer);
             commandInfo.ReplyToCommand("Invisiblity disabled");
         }
     }
