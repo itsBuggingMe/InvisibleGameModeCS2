@@ -50,7 +50,7 @@ public class InvisPlugin : BasePlugin
     [ConsoleCommand("css_invis", "Invisible command")]
     public void OnInvisCommand(CCSPlayerController player, CommandInfo commandInfo)
     {
-        if(commandInfo.ArgString.Length == 0)
+        if (commandInfo.ArgString.Length == 0)
         {
             commandInfo.ReplyToCommand("Usage: css_invis <player>");
             return;
@@ -59,14 +59,13 @@ public class InvisPlugin : BasePlugin
             return;
         if (!InvisIds.Contains(player.UserId))
         {
-            // cl_drawhud_force_radar -1 for the user to desactivate the radar
             commandInfo.ReplyToCommand("User " + player.PlayerName + " is now invisible");
             player.PlayerPawn.Value.NextRadarUpdateTime = 0.0f;
             SetPlayerInvisible(player);
             InvisIds.Add(player.UserId);
             commandInfo.ReplyToCommand("Invisiblity enabled");
         }
-        
+
     }
 
     [ConsoleCommand("css_uninvis", "Make Visible command")]
@@ -107,7 +106,6 @@ public class InvisPlugin : BasePlugin
 
         // Ensure remainingTime is non-negative and rounds appropriately
         int remainingTime = Math.Max((int)Math.Round(timeInMs / 100), 0);
-        Logger.LogInformation("Remaining time " + timeInMs + " calculated as " + remainingTime);
 
         // Make the player visible immediately
         SetPlayerVisible(player);
@@ -194,7 +192,7 @@ public class InvisPlugin : BasePlugin
 
     public static void SetPlayerInvisible(CCSPlayerController player)
     {
-        
+
         var playerPawnValue = player.PlayerPawn.Value;
         if (playerPawnValue == null || !playerPawnValue.IsValid)
         {
@@ -238,8 +236,8 @@ public class InvisPlugin : BasePlugin
             activeWeapon.AnimatedEveryTick = false;
             Utilities.SetStateChanged(activeWeapon, "CBaseModelEntity", "m_clrRender");
         }
-        
-        var myWeapons = playerPawnValue.WeaponServices?.MyWeapons;    
+
+        var myWeapons = playerPawnValue.WeaponServices?.MyWeapons;
         if (myWeapons != null)
         {
             foreach (var gun in myWeapons)
@@ -273,7 +271,7 @@ public class InvisPlugin : BasePlugin
         CCSPlayerController player = @event.Userid!;
 
         int playerevent = (int)player.UserId!;
- 
+
         if (InvisIds.Contains(playerevent))
         {
             SetPlayerInvisible(player);
@@ -289,12 +287,9 @@ public class InvisPlugin : BasePlugin
         int playerevent = (int)player.UserId!;
         int volume = @event.Radius;
 
-        Logger.LogInformation("the volume for player " + player.PlayerName + " and the sound is " + volume + " " + invisTimeMultiplier);
-        Logger.LogInformation("playerevent" + playerevent + "is in invisIds " + InvisIds.Contains(playerevent));
         if (InvisIds.Contains(playerevent) && volume > 550)
         {
             SetPlayerVisibleForLimitedTime(player, invisTimeMultiplier * (float)volume);
-            Logger.LogInformation("the volume for player " + player.PlayerName + " and the sound is " + volume + " " +invisTimeMultiplier);
         }
         return HookResult.Continue;
     }
@@ -306,15 +301,12 @@ public class InvisPlugin : BasePlugin
         if (InvisIds.Contains(player.UserId))
         {
             SetPlayerVisibleForLimitedTime(player, invisTimeMultiplier * volume);
-            Logger.LogInformation("the volume for player " + player.PlayerName + " and the sound is " + volume);
         }
         else
         {
-            Logger.LogInformation("Player is not in invis mode");
             var playPawnValue = player.PlayerPawn.Value!;
             playPawnValue.Health -= 2;
             Utilities.SetStateChanged(player.PlayerPawn.Value, "CBaseEntity", "m_iHealth");
-            Logger.LogInformation("Current health " + playPawnValue.Health);
         }
         return HookResult.Continue;
     }
@@ -325,7 +317,7 @@ public class InvisPlugin : BasePlugin
         int playerevent = (int)player.UserId!;
         if (InvisIds.Contains(playerevent))
         {
-            SetPlayerVisibleForLimitedTime(player, invisTimeMultiplier* (float)500);
+            SetPlayerVisibleForLimitedTime(player, invisTimeMultiplier * (float)500);
         }
         return HookResult.Continue;
     }
@@ -336,7 +328,7 @@ public class InvisPlugin : BasePlugin
         int playerevent = (int)player.UserId!;
         if (InvisIds.Contains(playerevent))
         {
-            SetPlayerVisibleForLimitedTime(player, invisTimeMultiplier* (float)500);
+            SetPlayerVisibleForLimitedTime(player, invisTimeMultiplier * (float)500);
         }
         return HookResult.Continue;
     }
