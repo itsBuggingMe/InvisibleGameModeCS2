@@ -26,7 +26,8 @@ public class InvisPlugin : BasePlugin
     private static Timer? visibilityTimer;
     private static HashSet<int?> InvisIds = new HashSet<int?>();
     private static float invisTimeMultiplier = 1.2f;
-    private CancellationTokenSource visibilityTokenSource;
+    private CancellationTokenSource? visibilityTokenSource;
+    private static Dictionary<int, string> playerIds = new Dictionary<int, string>();
     public override void Load(bool hotReload)
     {
         Console.WriteLine(" ");
@@ -59,11 +60,30 @@ public class InvisPlugin : BasePlugin
             return;
 
         string playerName = commandInfo.ArgString;
-        var targetPlayer = Server.GetPlayerByName(playerName);
+
+        // make a for loop to get the player by name
+        CCSPlayerController? targetPlayer = null;
+        foreach (var playerid in playerIds)
+        {
+            if (playerid.Value == playerName)
+            {
+                var potentialTarget = Utilities.GetPlayerFromUserid(playerid.Key);
+                if (potentialTarget != null)
+                {
+                    targetPlayer = potentialTarget;
+                    break;
+                }
+            }
+        }
+        if (targetPlayer == null)
+        {
+            commandInfo.ReplyToCommand("Player not found");
+            return;
+        }
+
         if (!InvisIds.Contains(targetPlayer.UserId))
         {
             commandInfo.ReplyToCommand("User " + targetPlayer.PlayerName + " is now invisible");
-            targetPlayer.PlayerPawn.Value.NextRadarUpdateTime = 0.0f;
             SetPlayerInvisible(targetPlayer);
             InvisIds.Add(targetPlayer.UserId);
             commandInfo.ReplyToCommand("Invisiblity enabled");
@@ -77,8 +97,26 @@ public class InvisPlugin : BasePlugin
             return;
 
         string playerName = commandInfo.ArgString;
-        var targetPlayer = Server.GetPlayerByName(playerName);
 
+        // make a for loop to get the player by name
+        CCSPlayerController? targetPlayer = null;
+        foreach (var playerid in playerIds)
+        {
+            if (playerid.Value == playerName)
+            {
+                var potentialTarget = Utilities.GetPlayerFromUserid(playerid.Key);
+                if (potentialTarget != null)
+                {
+                    targetPlayer = potentialTarget;
+                    break;
+                }
+            }
+        }
+        if (targetPlayer == null)
+        {
+            commandInfo.ReplyToCommand("Player not found");
+            return;
+        }
         if (InvisIds.Contains(targetPlayer.UserId))
         {
             InvisIds.Remove(targetPlayer.UserId);
@@ -215,16 +253,8 @@ public class InvisPlugin : BasePlugin
 
         var activeWeapon = playerPawnValue!.WeaponServices?.ActiveWeapon.Value;
         // if user is terrorist
-        C4LightEffect_t c4LightEffect_T;
-        c4LightEffect_T = C4LightEffect_t.eLightEffectNone;
-
-
-        //public enum C4LightEffect_t : uint
-        //{
-        //    eLightEffectNone,
-        //    eLightEffectDropped,
-        //    eLightEffectThirdPersonHeld
-        //}
+        //C4LightEffect_t c4LightEffect_T;
+        //c4LightEffect_T = C4LightEffect_t.eLightEffectNone;
 
         if (activeWeapon != null && activeWeapon.IsValid)
         {
@@ -312,7 +342,14 @@ public class InvisPlugin : BasePlugin
         {
             var playPawnValue = player.PlayerPawn.Value!;
             playPawnValue.Health -= 2;
-            Utilities.SetStateChanged(player.PlayerPawn.Value, "CBaseEntity", "m_iHealth");
+            if (player.PlayerPawn.Value != null)
+            {
+                Utilities.SetStateChanged(player.PlayerPawn.Value, "CBaseEntity", "m_iHealth");
+            }
+            if(playPawnValue.Health <= 0)
+            {
+                player.CommitSuicide(false, true);
+            }
         }
         return HookResult.Continue;
     }
@@ -338,17 +375,17 @@ public class InvisPlugin : BasePlugin
         }
         return HookResult.Continue;
     }
-    //[GameEventHandler]
-    //public HookResult OnPlayerConnect(EventPlayerConnect @event, GameEventInfo info)
-    //{
-    //    // when a user is connecting, we desactivate helpers to not show the player if he is in front of him
-    //    CCSPlayerController player = @event.Userid!;
-    //    var playerPawnValue = player.PlayerPawn.Value;
-    //    Utilities.SetStateChanged(playerPawnValue, "CBasePlayer", "m_bShowHints");
-    //    // désactiver le radar pour le joueur
-    //    playerPawnValue.NextRadarUpdateTime = 0.0f;
-    //    return HookResult.Continue;
-    //}
+    [GameEventHandler]
+    public HookResult OnPlayerConnect(EventPlayerConnect @event, GameEventInfo info)
+ {   
+        // when a user is connecting, we desactivate helpers to not show the player if he is in front of him
+        CCSPlayerController player = @event.Userid!;
+        if (player.UserId.HasValue)
+        {
+            playerIds.Add(player.UserId.Value, player.PlayerName);
+        }
+        return HookResult.Continue;
+}
     //[GameEventHandler]
     //public HookResult OnPlayerDisconnect(EventPlayerDisconnect @event, GameEventInfo info)
     //{
