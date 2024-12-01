@@ -27,7 +27,7 @@ public class InvisPlugin : BasePlugin
     private static HashSet<int?> InvisIds = new HashSet<int?>();
     private static float invisTimeMultiplier = 1.2f;
     private CancellationTokenSource? visibilityTokenSource;
-    private static Dictionary<int, string> playerIds = new Dictionary<int, string>();
+    private readonly Dictionary<int, string> playerIds = new();
     public override void Load(bool hotReload)
     {
         Console.WriteLine(" ");
@@ -62,26 +62,14 @@ public class InvisPlugin : BasePlugin
         string playerName = commandInfo.ArgString;
 
         // make a for loop to get the player by name
-        CCSPlayerController? targetPlayer = null;
-        foreach (var playerid in playerIds)
-        {
-            if (playerid.Value == playerName)
-            {
-                var potentialTarget = Utilities.GetPlayerFromUserid(playerid.Key);
-                if (potentialTarget != null)
-                {
-                    targetPlayer = potentialTarget;
-                    break;
-                }
-            }
-        }
+        CCSPlayerController? targetPlayer = GetPlayerByName(name: playerName);
         if (targetPlayer == null)
         {
             commandInfo.ReplyToCommand("Player not found");
-            return;
         }
 
-        if (!InvisIds.Contains(targetPlayer.UserId))
+
+            if (!InvisIds.Contains(targetPlayer.UserId))
         {
             commandInfo.ReplyToCommand("User " + targetPlayer.PlayerName + " is now invisible");
             SetPlayerInvisible(targetPlayer);
@@ -99,19 +87,7 @@ public class InvisPlugin : BasePlugin
         string playerName = commandInfo.ArgString;
 
         // make a for loop to get the player by name
-        CCSPlayerController? targetPlayer = null;
-        foreach (var playerid in playerIds)
-        {
-            if (playerid.Value == playerName)
-            {
-                var potentialTarget = Utilities.GetPlayerFromUserid(playerid.Key);
-                if (potentialTarget != null)
-                {
-                    targetPlayer = potentialTarget;
-                    break;
-                }
-            }
-        }
+        CCSPlayerController? targetPlayer = GetPlayerByName(name: playerName);
         if (targetPlayer == null)
         {
             commandInfo.ReplyToCommand("Player not found");
@@ -346,7 +322,7 @@ public class InvisPlugin : BasePlugin
             {
                 Utilities.SetStateChanged(player.PlayerPawn.Value, "CBaseEntity", "m_iHealth");
             }
-            if(playPawnValue.Health <= 0)
+            if (playPawnValue.Health <= 0)
             {
                 player.CommitSuicide(false, true);
             }
@@ -375,17 +351,32 @@ public class InvisPlugin : BasePlugin
         }
         return HookResult.Continue;
     }
-    [GameEventHandler]
-    public HookResult OnPlayerConnect(EventPlayerConnect @event, GameEventInfo info)
- {   
-        // when a user is connecting, we desactivate helpers to not show the player if he is in front of him
-        CCSPlayerController player = @event.Userid!;
-        if (player.UserId.HasValue)
+    public CCSPlayerController? GetPlayerByName(string name)
+    {
+        var players = Utilities.GetPlayers();
+        foreach (var player in players)
         {
-            playerIds.Add(player.UserId.Value, player.PlayerName);
+            if (player.PlayerName.Equals(name, StringComparison.OrdinalIgnoreCase))
+            {
+                return player;
+            }
+
         }
-        return HookResult.Continue;
-}
+            //string[] playerNames = new string[players.Count()]; // Définir la taille du tableau
+            //int i = 0;
+
+            //foreach (var player in players)
+            //{
+            //    playerNames[i] = player.PlayerName;
+            //    i++;
+            //}
+
+            //// Joindre les noms avec une virgule et répondre à la commande
+            //commandInfo.ReplyToCommand("Players: " + string.Join(", ", playerNames));
+
+        return null;
+    }
+
     //[GameEventHandler]
     //public HookResult OnPlayerDisconnect(EventPlayerDisconnect @event, GameEventInfo info)
     //{
