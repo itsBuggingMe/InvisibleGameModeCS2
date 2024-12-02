@@ -25,7 +25,7 @@ public class InvisPlugin : BasePlugin
     public override string ModuleDescription => "Invisibility plugin";
     private static Timer? visibilityTimer;
     private static HashSet<int?> InvisIds = new HashSet<int?>();
-    private static float invisTimeMultiplier = 1.2f;
+    private static float invisTimeMultiplier = 0.7f;
     private CancellationTokenSource? visibilityTokenSource;
     private readonly Dictionary<int, string> playerIds = new();
     public override void Load(bool hotReload)
@@ -62,7 +62,7 @@ public class InvisPlugin : BasePlugin
         string playerName = commandInfo.ArgString;
 
         // make a for loop to get the player by name
-        CCSPlayerController? targetPlayer = GetPlayerByName(name: playerName);
+        CCSPlayerController? targetPlayer = GetPlayerByName(name: playerName, commandInfo);
         if (targetPlayer == null)
         {
             commandInfo.ReplyToCommand("Player not found");
@@ -87,7 +87,7 @@ public class InvisPlugin : BasePlugin
         string playerName = commandInfo.ArgString;
 
         // make a for loop to get the player by name
-        CCSPlayerController? targetPlayer = GetPlayerByName(name: playerName);
+        CCSPlayerController? targetPlayer = GetPlayerByName(name: playerName, commandInfo);
         if (targetPlayer == null)
         {
             commandInfo.ReplyToCommand("Player not found");
@@ -118,59 +118,64 @@ public class InvisPlugin : BasePlugin
     }
     public void SetPlayerVisibleForLimitedTime(CCSPlayerController player, float timeInMs)
     {
-        // Cancel the previous timer if it exists and reset the cancellation token
+        // Annuler les timers précédents
         visibilityTokenSource?.Cancel();
         visibilityTimer?.Kill();
         visibilityTokenSource = new CancellationTokenSource();
         var token = visibilityTokenSource.Token;
 
-        // Ensure remainingTime is non-negative and rounds appropriately
-        int remainingTime = Math.Max((int)Math.Round(timeInMs / 100), 0);
+        int totalTime = Math.Max((int)Math.Round(timeInMs / 100), 0);
+        int fadeStartTime = totalTime / 2; // Le fade commence à la moitié du timer
+        int remainingTime = totalTime;
 
-        // Make the player visible immediately
         SetPlayerVisible(player);
 
-        // Set up the visual timer display
-        string timeMessage = "_ _ _ _ _ _ _ _ _ _";
-        int totalSegments = 10; // Adjust to match the length of timeMessage
+        string timeMessage = "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿";
+        int totalSegments = 20;
+
         visibilityTimer = new Timer(0.2f, () =>
         {
             if (remainingTime <= 0 || token.IsCancellationRequested)
             {
-                // End of the timer or cancellation requested, make the player invisible
-                player.PrintToCenter(""); // Clear the message
+                visibilityTimer?.Kill();
+                player.PrintToCenter("");
+
+                // Assurez-vous que le joueur est complètement invisible
                 SetPlayerInvisible(player);
-                visibilityTimer?.Kill(); // Stop the timer
-                return; // Exit the timer callback
+                return;
             }
 
-            // Calculate filled segments based on remaining time
+            // Calculer les segments affichés
             int filledSegments = Math.Max(0, Math.Min(totalSegments, totalSegments - remainingTime));
-
-            // Update the timer display based on filled and empty segments
-            timeMessage = new string('#', filledSegments) + new string('_', totalSegments - filledSegments);
-
-            // Show the updated timer and remaining time to the player
+            timeMessage = new string('⣿', totalSegments - filledSegments) + new string('⠀', filledSegments);
             player.PrintToCenter(timeMessage);
 
-            // Decrement the remaining time
+            // Début du fade à la moitié du temps
+            if (remainingTime <= fadeStartTime)
+            {
+                // Calculer l'opacité en fonction du temps restant
+                int alpha = (int)(255 * (remainingTime / (float)fadeStartTime));
+                SetPlayerTransparency(player, alpha);
+            }
+
             remainingTime--;
         }, TimerFlags.REPEAT);
 
-        // Add the timer to the collection to ensure it's managed by the plugin
         Timers.Add(visibilityTimer);
 
-        // Set up a final failsafe to ensure player becomes invisible if the timer somehow doesn't complete
         _ = Task.Delay((int)timeInMs, token).ContinueWith(_ =>
         {
             if (!token.IsCancellationRequested)
             {
+                visibilityTimer?.Kill();
                 player.PrintToCenter("");
+
+                // Assurez-vous que le joueur est complètement invisible
                 SetPlayerInvisible(player);
-                visibilityTimer?.Kill(); // Make sure the timer is stopped
             }
         }, TaskScheduler.Default);
     }
+
     public static void SetPlayerVisible(CCSPlayerController player)
     {
         var playerPawnValue = player.PlayerPawn.Value;
@@ -200,14 +205,6 @@ public class InvisPlugin : BasePlugin
                 }
             }
         }
-    }
-
-
-
-    private static void ShowTimerToPlayer(CCSPlayerController player, string timerDisplay)
-    {
-        // Implémentation d'affichage en jeu, exemple simple avec un message
-        player.PrintToCenterHtml(timerDisplay);
     }
 
     public static void SetPlayerInvisible(CCSPlayerController player)
@@ -298,7 +295,8 @@ public class InvisPlugin : BasePlugin
         CCSPlayerController player = @event.Userid!;
         int playerevent = (int)player.UserId!;
         int volume = @event.Radius;
-
+        if(volume >1100) { volume = 1100 ; }
+        
         if (InvisIds.Contains(playerevent) && volume > 550)
         {
             SetPlayerVisibleForLimitedTime(player, invisTimeMultiplier * (float)volume);
@@ -351,7 +349,7 @@ public class InvisPlugin : BasePlugin
         }
         return HookResult.Continue;
     }
-    public CCSPlayerController? GetPlayerByName(string name)
+    public CCSPlayerController? GetPlayerByName(string name, CommandInfo commandInfo)
     {
         var players = Utilities.GetPlayers();
         foreach (var player in players)
@@ -362,63 +360,50 @@ public class InvisPlugin : BasePlugin
             }
 
         }
-            //string[] playerNames = new string[players.Count()]; // Définir la taille du tableau
-            //int i = 0;
+        string[] playerNames = new string[players.Count()]; // Définir la taille du tableau
+        int i = 0;
+        foreach (var player in players)
+        {
+            playerNames[i] = player.PlayerName;
+            i++;
+        }
 
-            //foreach (var player in players)
-            //{
-            //    playerNames[i] = player.PlayerName;
-            //    i++;
-            //}
-
-            //// Joindre les noms avec une virgule et répondre à la commande
-            //commandInfo.ReplyToCommand("Players: " + string.Join(", ", playerNames));
+         // Joindre les noms avec une virgule et répondre à la commande
+         commandInfo.ReplyToCommand("Players: " + string.Join(", ", playerNames));
 
         return null;
     }
 
-    //[GameEventHandler]
-    //public HookResult OnPlayerDisconnect(EventPlayerDisconnect @event, GameEventInfo info)
-    //{
-    //    // when a user is disconnecting, we reactivate helpers to show the player if he is in front of him
-    //    CCSPlayerController player = @event.Userid!;
-    //    var playerPawnValue = player.PlayerPawn.Value;
-    //    Utilities.SetStateChanged(playerPawnValue, "CBasePlayer", "m_bShowHints");
-    //    return HookResult.Continue;
-    //}
-    //[GameEventHandler]
-    //public HookResult OnPlayerConnect(EventPlayerConnectFull @event, GameEventInfo info)
-    //{
-    //    // when a user is connecting, we desactivate helpers to not show the player if he is in front of him
-    //    CCSPlayerController player = @event.Userid!;
-    //    var playerPawnValue = player.PlayerPawn.Value;
-    //    playerPawnValue.NextRadarUpdateTime = 10000.0f;
-    //    Utilities.SetStateChanged(playerPawnValue, "CBasePlayer", "m_bShowHints");
-    //    // désactiver le radar pour le joueur
-    //    return HookResult.Continue;
-    //}
-    // if player is in t side and start planting the bomb, he becomes visible
-    //[GameEventHandler]
-    //public HookResult OnBombPlanted(EventBombPlanted @event, GameEventInfo info)
-    //{
-    //    CCSPlayerController player = @event.Userid!;
-    //    int playerevent = (int)player.UserId!;
-    //    if (InvisIds.Contains(playerevent))
-    //    {
-    //        SetPlayerVisibleForLimitedTime(player, 500);
-    //    }
-    //    return HookResult.Continue;
-    //}
-    //// if player is in t side and start defusing the bomb, he becomes visible
-    //[GameEventHandler]
-    //public HookResult OnBombDefused(EventBombDefused @event, GameEventInfo info)
-    //{
-    //    CCSPlayerController player = @event.Userid!;
-    //    int playerevent = (int)player.UserId!;
-    //    if (InvisIds.Contains(playerevent))
-    //    {
-    //        SetPlayerVisibleForLimitedTime(player, 500);
-    //    }
-    //    return HookResult.Continue;
-    //}
+
+
+    private void SetPlayerTransparency(CCSPlayerController player, int alpha)
+    {
+        var playerPawnValue = player.PlayerPawn.Value;
+        if (playerPawnValue == null) return;
+
+        // Définir la transparence du joueur
+        playerPawnValue.Render = Color.FromArgb(alpha, 255, 255, 255);
+        Utilities.SetStateChanged(playerPawnValue, "CBaseModelEntity", "m_clrRender");
+
+        // Définir la transparence des armes
+        var weapons = playerPawnValue.WeaponServices?.MyWeapons;
+        if (weapons != null)
+        {
+            foreach (var gun in weapons)
+            {
+                var weapon = gun.Value;
+                if (weapon != null)
+                {
+                    weapon.Render = Color.FromArgb(alpha, 255, 255, 255);
+                    Utilities.SetStateChanged(weapon, "CBaseModelEntity", "m_clrRender");
+                }
+            }
+        }
+    }
+
+
+
+
+
+
 }
