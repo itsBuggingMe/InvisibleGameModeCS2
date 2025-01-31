@@ -24,6 +24,8 @@ public class InvisPlugin : BasePlugin
     public override string ModuleAuthor => "Manio";
     public override string ModuleDescription => "Invisibility plugin";
     private static Timer? visibilityTimer;
+    private readonly Dictionary<int, Timer> playerTimers = new();  // Store individual timers per player
+    private readonly Dictionary<int, CancellationTokenSource> playerTokenSources = new(); // Store cancellation tokens per player
     private static HashSet<int?> InvisIds = new HashSet<int?>();
     private static float invisTimeMultiplier = 0.7f;
     private CancellationTokenSource? visibilityTokenSource;
@@ -117,6 +119,82 @@ public class InvisPlugin : BasePlugin
         }
     }
     public void SetPlayerVisibleForLimitedTime(CCSPlayerController player, float timeInMs)
+{
+    if(!player.UserId.HasValue) return; 
+    int playerId = player.UserId.Value;
+    
+    // Cancel and remove previous timer if it exists for this player
+    if (playerTimers.TryGetValue(playerId, out var existingTimer))
+    {
+        existingTimer.Kill();
+        playerTimers.Remove(playerId);
+    }
+    
+    if (playerTokenSources.TryGetValue(playerId, out var existingToken))
+    {
+        existingToken.Cancel();
+        playerTokenSources.Remove(playerId);
+    }
+
+    var tokenSource = new CancellationTokenSource();
+    var token = tokenSource.Token;
+    playerTokenSources[playerId] = tokenSource;
+
+    int totalTime = Math.Max((int)Math.Round(timeInMs / 100), 0);
+    int fadeStartTime = totalTime / 2; // Start fade effect at half time
+    int remainingTime = totalTime;
+
+    SetPlayerVisible(player);
+
+    string timeMessage = "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿";
+    int totalSegments = 20;
+
+    Timer visibilityTimer = new Timer(0.2f, () =>
+    {
+        if (remainingTime <= 0 || token.IsCancellationRequested)
+        {
+            player.PrintToCenter("");
+            SetPlayerInvisible(player);
+            
+            playerTimers.Remove(playerId);
+            playerTokenSources.Remove(playerId);
+            return;
+        }
+
+        // Update visual timer message
+        int filledSegments = Math.Max(0, Math.Min(totalSegments, totalSegments - remainingTime));
+        timeMessage = new string('⣿', totalSegments - filledSegments) + new string('⠀', filledSegments);
+        player.PrintToCenter(timeMessage);
+
+        // Start fade-out effect at halfway mark
+        if (remainingTime <= fadeStartTime)
+        {
+            int alpha = (int)(255 * (remainingTime / (float)fadeStartTime));
+            SetPlayerTransparency(player, alpha);
+        }
+
+        remainingTime--;
+
+    }, TimerFlags.REPEAT);
+
+    // Store the player's timer
+    playerTimers[playerId] = visibilityTimer;
+    Timers.Add(visibilityTimer);
+
+    // Final failsafe to ensure player becomes invisible after the time ends
+    _ = Task.Delay((int)timeInMs, token).ContinueWith(_ =>
+    {
+        if (!token.IsCancellationRequested)
+        {
+            player.PrintToCenter("");
+            SetPlayerInvisible(player);
+
+            playerTimers.Remove(playerId);
+            playerTokenSources.Remove(playerId);
+        }
+    }, TaskScheduler.Default);
+}
+    /*public void SetPlayerVisibleForLimitedTime(CCSPlayerController player, float timeInMs)
     {
         // Annuler les timers précédents
         visibilityTokenSource?.Cancel();
@@ -174,7 +252,7 @@ public class InvisPlugin : BasePlugin
                 SetPlayerInvisible(player);
             }
         }, TaskScheduler.Default);
-    }
+    }*/
 
     public static void SetPlayerVisible(CCSPlayerController player)
     {
@@ -188,6 +266,7 @@ public class InvisPlugin : BasePlugin
         {
             activeWeapon.Render = Color.FromArgb(255, 255, 255, 255);
             activeWeapon.ShadowStrength = 1.0f;
+            
             Utilities.SetStateChanged(activeWeapon, "CBaseModelEntity", "m_clrRender");
         }
 
@@ -243,6 +322,7 @@ public class InvisPlugin : BasePlugin
             activeWeapon.RenderMode = 0;
             activeWeapon.AnimationUpdateScheduled = false;
             activeWeapon.AnimatedEveryTick = false;
+            
             Utilities.SetStateChanged(activeWeapon, "CBaseModelEntity", "m_clrRender");
         }
 
@@ -400,10 +480,4 @@ public class InvisPlugin : BasePlugin
             }
         }
     }
-
-
-
-
-
-
 }
